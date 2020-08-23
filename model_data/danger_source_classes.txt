@@ -1,0 +1,6 @@
+warning sign
+no reflective cloth
+reflective cloth
+staircase
+insulating tool
+tool
