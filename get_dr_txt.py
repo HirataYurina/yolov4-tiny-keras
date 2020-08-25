@@ -10,7 +10,8 @@ from PIL import Image
 from keras.layers import Input
 from keras import backend as K
 from utils.utils import letterbox_image
-from nets.yolo4 import yolo_body, yolo_eval
+from nets.yolo4 import yolo_eval
+from nets.yolo4_tiny import yolo4_tiny
 import colorsys
 import numpy as np
 import os
@@ -26,7 +27,7 @@ class MapYolo(YOLO):
 
     def __init__(self, **kwargs):
         super(MapYolo, self).__init__(**kwargs)
-        self.scores = CONFIG.DETECT.SCORE
+        self.score = CONFIG.DETECT.SCORE
         self.iou = CONFIG.DETECT.IOU
         self.resolution = CONFIG.DETECT.RESOLUTION
 
@@ -40,7 +41,7 @@ class MapYolo(YOLO):
         try:
             self.yolo_model = load_model(model_path, compile=False)
         except:
-            self.yolo_model = yolo_body(Input(shape=(None, None, 3)), num_anchors // 3, num_classes)
+            self.yolo_model = yolo4_tiny(Input(shape=(None, None, 3)), num_anchors // 2, num_classes)
             self.yolo_model.load_weights(self.model_path)
         else:
             assert self.yolo_model.layers[-1].output_shape[-1] == \
@@ -74,7 +75,7 @@ class MapYolo(YOLO):
         f = open("./mAP/detection-results/" + image_id + ".txt", "w")
 
         # use letter box to resize the original img
-        new_image_size = self.resulition
+        new_image_size = self.resolution
         boxed_image = letterbox_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
         image_data /= 255.

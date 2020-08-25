@@ -47,8 +47,7 @@ def data_generator(annotation_lines,
                    batch_size,
                    input_shape,
                    anchors,
-                   num_classes,
-                   max_boxes):
+                   num_classes):
     """data generator for fit_generator
     the assignment strategy:
         one gt ---> one anchor
@@ -77,7 +76,7 @@ def data_generator(annotation_lines,
             if i == 0:
                 # shuffle dataset at begin of epoch
                 np.random.shuffle(annotation_lines)
-            image, box = get_random_data(annotation_lines[i], input_shape, max_boxes=max_boxes)
+            image, box = get_random_data(annotation_lines[i], input_shape)
             image_data.append(image)
             box_data.append(box)
             i = (i + 1) % n
@@ -93,8 +92,7 @@ def data_generator_mosaic_iou_thres(annotation_lines,
                                     batch_size,
                                     input_shape,
                                     anchors,
-                                    num_classes,
-                                    iou_threshold):
+                                    num_classes):
     """data generator for fit_generator
     the assignment strategy:
         one gt ---> more anchor(iou > iou_threshold)
@@ -131,7 +129,7 @@ def data_generator_mosaic_iou_thres(annotation_lines,
         box_data = np.array(box_data)
 
         y_true = preprocess_true_boxes_iou_thres(box_data, input_shape, anchors, num_classes,
-                                                 iou_threshold=iou_threshold)
+                                                 iou_threshold=CONFIG.TRAIN.IOU_THRESHOLD)
         # use yield to get generator
         yield [image_data, *y_true], np.zeros(batch_size)
 
@@ -436,7 +434,7 @@ if __name__ == "__main__":
                                       max_queue_size=CONFIG.DATASET.MAX_QUEUE,
                                       annotation_lines=lines, batch_size=batch_size,
                                       input_shape=input_shape, anchors=anchors,
-                                      num_classes=num_classes, iou_threshold=CONFIG.TRAIN.IOU_THRESHOLD),
+                                      num_classes=num_classes),
                             steps_per_epoch=max(1, num_train // batch_size),
                             # validation_data=get_batch(1, annotation_lines=valid_lines, batch_size=batch_size,
                             #                           input_shape=input_shape, anchors=anchors,
@@ -472,7 +470,7 @@ if __name__ == "__main__":
                                       max_queue_size=CONFIG.DATASET.MAX_QUEUE,
                                       annotation_lines=lines, batch_size=batch_size,
                                       input_shape=input_shape, anchors=anchors,
-                                      num_classes=num_classes, iou_threshold=CONFIG.TRAIN.IOU_THRESHOLD),
+                                      num_classes=num_classes),
                             steps_per_epoch=max(1, num_train // batch_size),
                             # validation_data=get_batch(annotation_lines=valid_lines, batch_size=batch_size,
                             #                           input_shape=input_shape, anchors=anchors,
