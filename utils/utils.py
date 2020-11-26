@@ -136,11 +136,11 @@ def get_random_mosaic_data(annotations,
                            max_boxes=CONFIG.AUG.MAX_BOXES,
                            hue=.1,
                            sat=1.5,
-                           val=1.5):
+                           val=1.5,
+                           jitter=0.3):
     """mosaic augment V1
     mosaic augment V1 can make every image be cropped to be suitable for four regions.
     But this lose variety of image scale because every image need to suitable for their region.
-
     Args:
         annotations: ['img_path x1, y1, x2, y2 class', 'img_path x1, y1, x2, y2 class', ...]
                      merge four images one time
@@ -149,16 +149,16 @@ def get_random_mosaic_data(annotations,
         hue:         random hue transformation
         sat:         random sat transformation
         val:         random val transformation
-
+        jitter
     Returns:
         augment data with mosaic
-
     """
     h, w = input_shape
     min_x = 0.4
     min_y = 0.4
     scale_min = 1 - min(min_x, min_y)
-    scale_max = scale_min + 0.2
+    # scale_max = scale_min + 0.2
+    scale_max = scale_min + 0.6
 
     place_x = [0, int(min_x * w), 0, int(min_x * w)]
     place_y = [0, 0, int(min_y * h), int(min_y * h)]
@@ -177,9 +177,14 @@ def get_random_mosaic_data(annotations,
         boxes = np.array([np.array(list(map(int, box.split(',')))) for box in contents[1:]])
 
         # 1.resize
-        rand_scale = rand(scale_min, scale_max)
-        new_h = int(h * rand_scale)
-        new_w = int(new_h * (w / h))
+        new_ar = w / h * rand(1 - jitter, 1 + jitter) / rand(1 - jitter, 1 + jitter)
+        scale = rand(scale_min, scale_max)
+        if new_ar < 1:
+            new_h = int(scale * h)
+            new_w = int(new_h * new_ar)
+        else:
+            new_w = int(scale * w)
+            new_h = int(new_w / new_ar)
         img = img.resize((new_w, new_h), Image.BICUBIC)
 
         # 2.flip
@@ -233,6 +238,13 @@ def get_random_mosaic_data(annotations,
             boxes = boxes[np.logical_and(boxes_w > 1, boxes_y > 1)]
 
             boxes_data.append(boxes)
+        else:
+            # TODO: ######################################################################################
+            # TODO: have fixed bug:
+            # TODO: if len(boxes) <= 0, boxes not appended into boxes_data,
+            # TODO: so, when cropping the boxes, it will encounter errors because i use i in for loop
+            # TODO: ######################################################################################
+            boxes_data.append([])
 
     # 6.crop imgs
     cropx = np.random.randint(int(w * min_x), int(w * (1 - min_x)))
@@ -247,9 +259,9 @@ def get_random_mosaic_data(annotations,
 
     new_boxes = crop_boxes(boxes_data, cropx, cropy)
     num_boxes = len(new_boxes)
-    if num_boxes <= max_boxes:
+    if num_boxes <= max_boxes and num_boxes > 0:
         boxes[0:num_boxes] = new_boxes
-    else:
+    elif num_boxes > max_boxes:
         boxes = new_boxes[:max_boxes]
 
     return merge_img, boxes
@@ -261,40 +273,42 @@ def crop_boxes(boxes, cropx, cropy):
     cropped_boxes = []
 
     for i, boxes in enumerate(boxes):
-        if i == 0:
+        # TODO: ##############################################################
+        # TODO: have fixed bug that if boxes=[], there will have some errors
+        # TODO: ##############################################################
+        if i == 0 and len(boxes) > 0:
             boxes[..., [0, 2]] = np.minimum(cropx, boxes[..., [0, 2]])
             boxes[..., [1, 3]] = np.minimum(cropy, boxes[..., [1, 3]])
             boxes_w = boxes[..., 2] - boxes[..., 0]
             boxes_h = boxes[..., 3] - boxes[..., 1]
-            valid_boxes = boxes[np.logical_and(boxes_w >= 10, boxes_h >= 10)]
-            cropped_boxes.append(valid_boxes)
+            valid_boxes = boxes[np.logical_and(boxes_w >= 5, boxes_h >= 5)]
+            cropped_boxes.extend(valid_boxes)
 
-        if i == 1:
+        if i == 1 and len(boxes) > 0:
             boxes[..., [0, 2]] = np.maximum(cropx, boxes[..., [0, 2]])
             boxes[..., [1, 3]] = np.minimum(cropy, boxes[..., [1, 3]])
             boxes_w = boxes[..., 2] - boxes[..., 0]
             boxes_h = boxes[..., 3] - boxes[..., 1]
-            valid_boxes = boxes[np.logical_and(boxes_w >= 10, boxes_h >= 10)]
-            cropped_boxes.append(valid_boxes)
+            valid_boxes = boxes[np.logical_and(boxes_w >= 5, boxes_h >= 5)]
+            cropped_boxes.extend(valid_boxes)
 
-        if i == 2:
+        if i == 2 and len(boxes) > 0:
             boxes[..., [0, 2]] = np.minimum(cropx, boxes[..., [0, 2]])
             boxes[..., [1, 3]] = np.maximum(cropy, boxes[..., [1, 3]])
             boxes_w = boxes[..., 2] - boxes[..., 0]
             boxes_h = boxes[..., 3] - boxes[..., 1]
-            valid_boxes = boxes[np.logical_and(boxes_w >= 10, boxes_h >= 10)]
-            cropped_boxes.append(valid_boxes)
+            valid_boxes = boxes[np.logical_and(boxes_w >= 5, boxes_h >= 5)]
+            cropped_boxes.extend(valid_boxes)
 
-        if i == 3:
+        if i == 3 and len(boxes) > 0:
             boxes[..., [0, 2]] = np.maximum(cropx, boxes[..., [0, 2]])
             boxes[..., [1, 3]] = np.maximum(cropy, boxes[..., [1, 3]])
             boxes_w = boxes[..., 2] - boxes[..., 0]
             boxes_h = boxes[..., 3] - boxes[..., 1]
-            valid_boxes = boxes[np.logical_and(boxes_w >= 10, boxes_h >= 10)]
-            cropped_boxes.append(valid_boxes)
+            valid_boxes = boxes[np.logical_and(boxes_w >= 5, boxes_h >= 5)]
+            cropped_boxes.extend(valid_boxes)
 
-    return np.concatenate(cropped_boxes, axis=0)
-
+    return np.array(cropped_boxes)
 
 def get_random_mosaic_data_v2(annotations,
                               input_shape,
