@@ -121,7 +121,7 @@ def data_generator_mosaic_iou_thres(annotation_lines,
             if i == 0:
                 # shuffle dataset at begin of epoch
                 np.random.shuffle(annotation_lines)
-            image, box = get_random_mosaic_data_v2(annotation_lines[i:i + 4], input_shape)
+            image, box = get_random_mosaic_data(annotation_lines[i:i + 4], input_shape)
             image_data.append(image)
             box_data.append(box)
             i = (i + 1) % shuffle_num
